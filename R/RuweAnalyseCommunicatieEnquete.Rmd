@@ -1,0 +1,198 @@
+Gegevensverwerking Enquete Communicatie 2012 en 2014
+========================================================
+
+
+
+```{r LoadData, echo=FALSE}
+setwd("W:\\P192.CommunicatieEnquete")
+library("RODBC")
+library("reshape2")
+library("plyr")
+library("ggplot2")
+library("xtable")
+ 
+ conn <- odbcConnectExcel2007("Gegevens enquete interne communicatie 2012 en 2014.xlsx")
+ query <- "SELECT dat.VraagNr, dat.ThemaNr, Beoordeling, [2012], [2014], vrg.VraagTitel, vrg.VraagTitel_vervolg, themas.ThemaTitel
+ FROM [Data$] dat, [Vragen$] vrg, [Themas$] themas
+ WHERE dat.VraagNr = vrg.VraagNr AND vrg.ThemaNr = themas.ThemaNr"
+ dfrOrig <- sqlQuery(conn, query);# dim(dfrOrig)
+ odbcClose(conn)
+ 
+ dfrMelt <- melt(dfrOrig, measure.vars = c("2012","2014"), variable.name = "Jaar", value.name = "Aantal")
+ dfrMelt <- dfrMelt[order(dfrMelt$VraagNr, dfrMelt$Jaar, dfrMelt$Beoordeling), ]
+ dfrVragen <- dfrMelt[!duplicated(dfrMelt$VraagNr),]
+
+```
+
+```{r CalculateData, echo = FALSE, warning=FALSE}
+
+resultobject <- list()
+for (i in dfrVragen$VraagNr){
+  vraag <- dfrVragen[dfrVragen$VraagNr == i, ,drop = F]
+  antwoorden <- dfrMelt[dfrMelt$VraagNr == i, , drop = F]
+  Tot2012 <- sum(antwoorden$Aantal[antwoorden$Jaar == "2012"], na.rm = T)
+  Tot2014 <- sum(antwoorden$Aantal[antwoorden$Jaar == "2014"], na.rm=T)
+  NA2012 <- sum(antwoorden$Aantal[antwoorden$Jaar == "2012" & is.na(antwoorden$Beoordeling)], na.rm=T)
+  NA2014 <- sum(antwoorden$Aantal[antwoorden$Jaar == "2014" & is.na(antwoorden$Beoordeling)], na.rm=T)
+  Resp2012 <- Tot2012 - NA2012
+  Resp2014 <- Tot2014 - NA2014
+  
+  antwoorden$Percentage[antwoorden$Jaar == "2012" & !is.na(antwoorden$Beoordeling)] <- 
+    antwoorden$Aantal[antwoorden$Jaar == "2012" & !is.na(antwoorden$Beoordeling)] / Resp2012 * 100 
+  
+  antwoorden$Percentage[antwoorden$Jaar == "2014" & !is.na(antwoorden$Beoordeling)] <- 
+    antwoorden$Aantal[antwoorden$Jaar == "2014" & !is.na(antwoorden$Beoordeling)] / Resp2014 * 100 
+  
+  if (any(antwoorden$Beoordeling %in% c('ja','nee'))) {
+    antwoorden$fBeoordeling <- factor(antwoorden$Beoordeling, levels = c("ja","nee"))
+    antwoorden$fBeoordeling2 <- antwoorden$fBeoordeling
+    Minstensgoed2012 <- antwoorden$Percentage[antwoorden$fBeoordeling == "ja" & antwoorden$Jaar == "2012" & !is.na(antwoorden$fBeoordeling)]
+    Minstensgoed2014 <- antwoorden$Percentage[antwoorden$fBeoordeling == "ja" & antwoorden$Jaar == "2014"& !is.na(antwoorden$fBeoordeling)]
+  } else
+  if (any(antwoorden$Beoordeling %in% c('+ en ++','- en --'))) {
+    antwoorden$fBeoordeling <- factor(antwoorden$Beoordeling, levels = c("+ en ++","- en --"))
+    antwoorden$fBeoordeling2 <- antwoorden$fBeoordeling
+    Minstensgoed2012 <- antwoorden$Percentage[antwoorden$fBeoordeling == "+ en ++" & antwoorden$Jaar == "2012"]
+    Minstensgoed2014 <- antwoorden$Percentage[antwoorden$fBeoordeling == "+ en ++" & antwoorden$Jaar == "2014"]
+  } else {
+    antwoorden$fBeoordeling <- factor(antwoorden$Beoordeling, levels = c("++", "+", "0","-","--"))
+    #antwoorden$fBeoordeling2 <- factor(antwoorden$Beoordeling, levels = c("++", "+", "0","-","--"), labels = c("+ en ++", "+ en ++", "0", "- en --", "- en --"))
+    antwoorden$fBeoordeling2 <- antwoorden$fBeoordeling
+    levels(antwoorden$fBeoordeling2)[levels(antwoorden$fBeoordeling2) %in% c("+", "++")] <- "+ en ++"
+    levels(antwoorden$fBeoordeling2)[levels(antwoorden$fBeoordeling2) %in% c("-", "--")] <- "- en --"
+    Minstensgoed2012 <- sum(antwoorden$Percentage[antwoorden$fBeoordeling %in% c("+","++") & antwoorden$Jaar == "2012"])
+    Minstensgoed2014 <- sum(antwoorden$Percentage[antwoorden$fBeoordeling %in% c("+","++") & antwoorden$Jaar == "2014"])
+  }
+  antwoorden <- antwoorden[order(antwoorden$Jaar, antwoorden$fBeoordeling), , drop = F]
+  antwoorden$CumPercentage[antwoorden$Jaar =="2012"] <- cumsum(antwoorden$Percentage[antwoorden$Jaar =="2012"]) 
+  antwoorden$CumPercentage[antwoorden$Jaar =="2014"] <- cumsum(antwoorden$Percentage[antwoorden$Jaar =="2014"]) 
+  
+  
+  tmplijstje <- list()
+  tmplijstje$VraagNr = i
+  tmplijstje$VraagTitel = paste(i,vraag$VraagTitel, ifelse(is.na(vraag$VraagTitel_vervolg), "", as.character(vraag$VraagTitel_vervolg)), sep = "\n")
+  tmplijstje$Thema = vraag$ThemaTitel
+  tmplijstje$Ruw = antwoorden[c("VraagNr","Jaar","fBeoordeling","fBeoordeling2","Aantal", "Percentage", "CumPercentage")]
+  tmplijstje$Aantallen2012 <- c(Totaal = Tot2012, GeenAntwoord = NA2012, Geteld = Resp2012)
+  tmplijstje$Aantallen2014 <- c(Totaal = Tot2014, GeenAntwoord = NA2014, Geteld = Resp2014)
+  tmplijstje$Minstensgoed2012 = Minstensgoed2012
+  tmplijstje$Minstensgoed2014 = Minstensgoed2014
+  
+  resultobject[[i]] <- tmplijstje
+}
+
+```
+
+
+Overzicht van de vragen
+--------------------------
+
+```{r overzichtVragen, echo=FALSE, warning=FALSE,  results='asis'}
+  outputdata <- dfrVragen[c("VraagNr", "ThemaNr", "VraagTitel", "VraagTitel_vervolg")]
+  print(xtable(outputdata), type = "html")
+```
+
+
+Figuren voor alle beoordelingsniveau's
+-------------------------------------------
+
+
+```{r AlleBeoordelingen, fig.width = 11, echo=FALSE, warning=FALSE}
+for (i in 1:length(resultobject)){
+  data <- resultobject[[i]]$Ruw
+  titel = resultobject[[i]]$VraagTitel
+  n2012 = resultobject[[i]]$Aantallen2012
+  n2014 = resultobject[[i]]$Aantallen2014
+  p1 <- ggplot(subset(data, !is.na(fBeoordeling)), aes(x = fBeoordeling, y = Percentage, fill =Jaar )) + geom_bar(stat = "identity", position = "dodge")
+  p1 <- p1 + ggtitle(paste(titel,  "\nN2012 = ", n2012[3]  , "( NA = ", n2012[2] ,                       "), \nN2014 = ", n2014[3]  , "( NA = ",n2014[2] , ")" )) + scale_y_continuous("Percentage (%)") + scale_x_discrete("Beoordeling")
+  print(p1)  
+}
+
+```
+
+
+
+Figuren waarbij beoordelingsniveau's gecombineerd zijn tot goed, geen mening en slecht
+---------------------------------------------------------------------------------------
+
+
+```{r GecombineerdBeside, fig.width = 11, echo=FALSE, warning=FALSE}
+for (i in 1:length(resultobject)){
+  data <- resultobject[[i]]$Ruw
+  data <- aggregate(data["Percentage"], data[c("fBeoordeling2","Jaar")], sum)
+  titel = resultobject[[i]]$VraagTitel
+  n2012 = resultobject[[i]]$Aantallen2012
+  n2014 = resultobject[[i]]$Aantallen2014
+  p1 <- ggplot(subset(data, !is.na(fBeoordeling2)), aes(x = fBeoordeling2, y = Percentage, fill =Jaar )) + geom_bar(stat = "identity", position = "dodge")
+  p1 <- p1 + ggtitle(paste(titel,  "\nN2012 = ", n2012[3]  , "( NA = ", n2012[2] ,                       "), \nN2014 = ", n2014[3]  , "( NA = ",n2014[2] , ")" )) + scale_y_continuous("Percentage (%)") + scale_x_discrete("Beoordeling")
+  print(p1)  
+}
+
+```
+
+
+
+Figuren waarbij beoordelingsniveau's gecombineerd zijn tot goed, geen mening en slecht maar nu als een stacked barplot
+---------------------------------------------------------------------------------------
+
+
+```{r GecombineerdStacked, fig.width = 11, echo=FALSE, warning=FALSE}
+for (i in 1:length(resultobject)){
+  data <- resultobject[[i]]$Ruw
+  data <- aggregate(data["Percentage"], data[c("fBeoordeling2","Jaar")], sum)
+  titel = resultobject[[i]]$VraagTitel
+  n2012 = resultobject[[i]]$Aantallen2012
+  n2014 = resultobject[[i]]$Aantallen2014
+  p1 <- ggplot(subset(data, !is.na(fBeoordeling2)), aes(x = Jaar, y = Percentage, fill = fBeoordeling2 )) + geom_bar(stat = "identity")
+  p1 <- p1 + ggtitle(paste(titel,  "\nN2012 = ", n2012[3]  , "( NA = ", n2012[2] ,                       "), \nN2014 = ", n2014[3]  , "( NA = ",n2014[2] , ")" )) + scale_y_continuous("Percentage (%)") + scale_x_discrete("Beoordeling")
+  print(p1)  
+}
+
+```
+
+
+
+
+Figuren cumulatief uitgezet, hoe sneller de curve stijgt hoe beter
+------------------------------------------------------------------------
+
+```{r Cumulatief, fig.width = 11, echo=FALSE,warning=FALSE}
+for (i in names(resultobject)){
+data <- resultobject[[i]]$Ruw  
+titel = resultobject[[i]]$VraagTitel
+subsetdata <- subset(data, !is.na(fBeoordeling))
+p2 <- NULL
+p2 <- ggplot(subsetdata,aes(x = fBeoordeling, y = CumPercentage, group = Jaar, colour = Jaar))
+p2 <- p2 + ggtitle(titel) +  geom_path(size = 1.5)
+p2 <- p2 + scale_y_continuous("Cumulatief percentage (%)", limits = c(0,100.01))
+print(p2)
+}
+```
+
+
+Tabel mat de evolutie van een minstens goede beoordeling per vraag.
+----------------------------------------------------------------------
+
+Hiervoor is de 2-sample proportietest gebruikt.
+Deze heeft als input een matrix met 2 kolommen die overeenkomen met success en failure en 2 rijen die overeenkomen met de verschillende stalen (hier 2012 en 2014). 
+Wat niet significant op 0.05-niveau was, staat in de tabel als ongewijzigd, significant positief als POSITIEF en significant negatief (dus 2014 slechter dan 2012) als NEGATIEF.
+
+```{r StatTest, echo=FALSE, warning=FALSE,  results='asis'}
+myfun <- function(x){
+  mat <- rbind(c(x$Minstensgoed2012*x$Aantallen2012[3]/100, Failure=(100-x$Minstensgoed2012)/100*x$Aantallen2012[3] ),
+               c(x$Minstensgoed2014*x$Aantallen2014[3]/100, Failure=(100-x$Minstensgoed2014)/100*x$Aantallen2014[3] ))
+  obj <- prop.test(mat)
+  #print(x$VraagNr)
+  #print(obj)
+  difference <- obj$estimate[2] - obj$estimate[1]
+  pvalue <- obj$p.value
+  oordeel <- ifelse(pvalue < 0.05, ifelse(difference>0, "POSITIEF", "NEGATIEF"), "ongewijzigd")
+  c(minstensgoed2012 = round(obj$estimate[1],3)*100, minstensgoed2014 = round(obj$estimate[2],3)*100, oordeel = oordeel, p_waarde = round(pvalue,3))
+}
+dataset <- ldply(resultobject, myfun)
+names(dataset) <- c("Vraagnummer", "Minstensgoed20112", "Minstensgoed2014","Oordeel", "p-waarde proportietest") 
+print(xtable(dataset), type = "html")
+#kable(dataset, format = "html")
+```
+
+
