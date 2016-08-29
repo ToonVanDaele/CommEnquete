@@ -1,0 +1,34 @@
+---
+title: "AnalyseWerkdocuemnt"
+author: "Toon Van Daele"
+date: "29 augustus 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r init}
+library(plyr)
+library(dplyr)
+library(pander)
+```
+
+
+```{r load data}
+#Inlezen van de data
+path <- "C:/Users/toon_vandaele/toon.vandaele@inbo.be/Projecten/CommunicatieEnquete_analyse/data/"
+
+df.Resp <- readRDS(file = paste0(path, "Resp.Rdata"))
+df.Q <- readRDS(file = paste0(path, "Q.Rdata"))
+df.AType <- readRDS(file = paste0(path, "AType.Rdata"))
+
+```
+
+# Overzicht vragenlijst
+
+```{r Q table, results='asis'}
+pandoc.table(df.Q)
+```
+

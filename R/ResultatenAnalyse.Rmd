@@ -1,6 +1,6 @@
 ---
-title: "De titel van het rapport"
-author: "Voornaam1 Achternaam1, Voornaam2 Achternaam2 \\& Voornaam3 Achternaam3"
+title: "Visualisatie van de resultaten van de enquête interne communicatie"
+author: "Toon Van Daele, Pieter Verschelde & Irina de Landsheer"
 output: 
   INBOmd::inbo_rapport_2015:
     subtitle : "Optionele ondertitel"
