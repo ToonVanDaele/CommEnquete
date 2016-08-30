@@ -7,12 +7,11 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-```
-
-```{r init}
 library(plyr)
 library(dplyr)
+library(tidyr)
 library(pander)
+library(ggplot2)
 ```
 
 
@@ -29,6 +28,76 @@ df.AType <- readRDS(file = paste0(path, "AType.Rdata"))
 # Overzicht vragenlijst
 
 ```{r Q table, results='asis'}
-pandoc.table(df.Q)
+#pandoc.table(df.Q)
 ```
+
+# Aantal respondenten per categorie in 2016
+
+```{r aantallen per catetogrie, results='asis'}
+
+countTable <- function(Qn) { 
+  df.Resp %>%
+    filter(Q == Qn, jaar == 2016 ) %>%
+    dplyr::count(Resp) %>%
+    pandoc.table()
+}
+
+countTable("Q1")
+countTable("Q2")
+countTable("Q3")
+countTable("Q4")
+```
+
+
+# Aantal respondenten per categorie gecombineerd 2016
+
+```{r results='asis'}
+Qcat <- c("Q1", "Q2", "Q3", "Q4")
+df.Resp %>%
+  filter(jaar == 2016, Q %in% Qcat) %>%
+  spread(key = Q, value = Resp) %>%
+  plyr::count(vars = Qcat) %>%
+  pandoc.table()  
+```
+
+
+# Figuur met alle categoriën
+
+```{r}
+
+PlotAll <- function(myQ, myTypeID) {
+  #myQ <- "Q7"
+  #myTypeID <- "ANA"
+  mylevels <- df.AType %>%
+    dplyr::filter(TypeID == myTypeID) %>%
+    dplyr::select(Level)
+  mylevels <- mylevels$Level
+  
+  df.temp <- df.Resp %>%
+    filter(Q == myQ) %>%
+    dplyr::left_join(df.Q, by = c("Q" = "VraagID"))
+  
+  df.temp$Resp <- factor(df.temp$Resp, levels = mylevels)
+  
+  df.plot <- plyr::count(df = df.temp, vars = "Resp")
+  
+  ggplot(df.plot, aes(x = Resp, y = freq)) + geom_bar(stat = "identity")
+  
+  #p1 <- ggplot(subset(data, !is.na(fBeoordeling)), aes(x = fBeoordeling, y = Percentage, fill =Jaar )) + geom_bar(stat = "identity", position = "dodge")
+  #p1 <- p1 + ggtitle(paste(titel,  "\nN2012 = ", n2012[3]  , "( NA = ", n2012[2] ,                       "), \nN2014 = ", n2014[3]  , "( NA = ",n2014[2] , ")" )) + scale_y_continuous("Percentage (%)") + scale_x_discrete("Beoordeling")
+  
+}
+
+PlotAll("Q6", "ANA")
+PlotAll(df.Q$VraagID[10:12], df.Q$AntwoordTypeID[10:12])
+
+Qlist <- df.Q[10:12,c(1,4)]
+
+mdply(.data = Qlist, .fun = function(sp_n, cal_reg){
+
+d_ply(.data = Qlist, .variables = c("VraagID", "AntwoordTypeID"),.fun = PlotAll)
+rowwise
+
+```
+
 
