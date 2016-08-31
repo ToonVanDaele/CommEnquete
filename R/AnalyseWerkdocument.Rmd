@@ -53,7 +53,7 @@ countTable("Q4")
 
 ```{r results='asis'}
 Qcat <- c("Q1", "Q2", "Q3", "Q4")
-df.Resp %>%
+  df.Resp %>% 
   filter(jaar == 2016, Q %in% Qcat) %>%
   spread(key = Q, value = Resp) %>%
   plyr::count(vars = Qcat) %>%
@@ -61,43 +61,202 @@ df.Resp %>%
 ```
 
 
-# Figuur met alle categoriën
+# Aantal antwoorden per vraag
 
 ```{r}
 
-PlotAll <- function(myQ, myTypeID) {
-  #myQ <- "Q7"
-  #myTypeID <- "ANA"
-  mylevels <- df.AType %>%
-    dplyr::filter(TypeID == myTypeID) %>%
-    dplyr::select(Level)
-  mylevels <- mylevels$Level
-  
-  df.temp <- df.Resp %>%
-    filter(Q == myQ) %>%
+df.Resp$jaar <- as.factor(df.Resp$jaar)
+
+temp <- df.Resp %>%
+  dplyr::filter(!Resp == "Weet niet") %>%
+  plyr::count(vars = c("jaar", "Q", "Resp"))
+
+tmpsum <- temp %>%
+  dplyr::group_by(Q, jaar) %>%
+  summarise(sum = sum(freq))
+
+df.Respp <- dplyr::left_join(temp, tmpsum, by = c("jaar", "Q"))
+df.Respp$Percentage <- df.Respp$freq / df.Respp$sum * 100
+
+df.RespNA <- df.Resp %>%
+  dplyr::filter(Resp == "Weet niet") %>%
+  plyr::count(vars = c("jaar", "Q", "Resp"))
+
+summary(df.Respp) 
+
+```
+
+# Figuur met alle categorieën voor specifiek jaar
+
+```{r}
+
+PlotAll <- function(myQ, myYear) {
+
+  df.plot <- df.Respp %>%
+    filter(Q == myQ, jaar == myYear) %>%
     dplyr::left_join(df.Q, by = c("Q" = "VraagID"))
   
-  df.temp$Resp <- factor(df.temp$Resp, levels = mylevels)
+  # Ook levels met 0 antwoorden moeten worden getoond
+  myAType <- filter(df.Q, VraagID == myQ)$AntwoordTypeID
+  mylevels <- filter(df.AType, TypeID == myAType, !Level == "Weet niet")$Level
+  df.plot$Resp <- factor(df.plot$Resp, levels = mylevels)
   
-  df.plot <- plyr::count(df = df.temp, vars = "Resp")
+  n <- sum(df.plot$freq)
+  nNA <- filter(df.RespNA, jaar == myYear, Q == myQ)$freq
   
-  ggplot(df.plot, aes(x = Resp, y = freq)) + geom_bar(stat = "identity")
-  
-  #p1 <- ggplot(subset(data, !is.na(fBeoordeling)), aes(x = fBeoordeling, y = Percentage, fill =Jaar )) + geom_bar(stat = "identity", position = "dodge")
-  #p1 <- p1 + ggtitle(paste(titel,  "\nN2012 = ", n2012[3]  , "( NA = ", n2012[2] ,                       "), \nN2014 = ", n2014[3]  , "( NA = ",n2014[2] , ")" )) + scale_y_continuous("Percentage (%)") + scale_x_discrete("Beoordeling")
-  
+  myTitle <- paste(df.plot$VraagTitel[1], " \n(n = ", n, ", Weet niet = ", nNA, ")")
+
+  print(myQ)
+
+  myplot <- ggplot(df.plot,  aes(x = Resp, y = Percentage)) + 
+    geom_bar(stat = 'identity') +
+    scale_y_continuous("Percentage (%)") +
+    ggtitle(myTitle) +
+    theme(axis.title.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+  print(myplot)
 }
 
-PlotAll("Q6", "ANA")
-PlotAll(df.Q$VraagID[10:12], df.Q$AntwoordTypeID[10:12])
+Qlist <- cbind(df.Q[10:12,1], 2016)
 
-Qlist <- df.Q[10:12,c(1,4)]
-
-mdply(.data = Qlist, .fun = function(sp_n, cal_reg){
-
-d_ply(.data = Qlist, .variables = c("VraagID", "AntwoordTypeID"),.fun = PlotAll)
-rowwise
+m_ply(.data = Qlist, .fun = PlotAll)
 
 ```
 
 
+
+# Figuur met alle categorieën voor alle jaren
+
+```{r}
+
+PlotTime <- function(myQ) {
+
+  df.plot <- df.Respp %>%
+    filter(Q == myQ) %>%
+    dplyr::left_join(df.Q, by = c("Q" = "VraagID"))
+  
+  # Ook levels met 0 antwoorden moeten worden getoond
+  myAType <- filter(df.Q, VraagID == myQ)$AntwoordTypeID
+  mylevels <- filter(df.AType, TypeID == myAType, !Level == "Weet niet")$Level
+  df.plot$Resp <- factor(df.plot$Resp, levels = mylevels)
+  
+  #n <- sum(df.plot$freq)
+  #nNA <- filter(df.RespNA, jaar == myYear, Q == myQ)$freq
+  
+  myTitle <- paste(df.plot$VraagTitel[1])  #, " \n(n = ", n, ", Weet niet = ", nNA, ")")
+
+  print(myQ)
+
+  myplot <- ggplot(df.plot,  aes(x = Resp, y = Percentage, fill = jaar)) + 
+    geom_bar(stat = 'identity', position = 'dodge') +
+    scale_y_continuous("Percentage (%)") +
+    ggtitle(myTitle) +
+    theme(axis.title.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+  print(myplot)
+}
+
+Qlist <- df.Q[8:10,1]
+
+m_ply(.data = Qlist, .fun = PlotTime)
+
+```
+
+# stacked bar alle categorieën voor specifiek jaar
+
+```{r fig.height= 3}
+
+PlotStackedAll <- function(myQ, myYear) {
+
+  df.plot <- df.Respp %>%
+    filter(Q == myQ, jaar == myYear) %>%
+    dplyr::left_join(df.Q, by = c("Q" = "VraagID"))
+  
+  # Ook levels met 0 antwoorden moeten worden getoond
+  myAType <- filter(df.Q, VraagID == myQ)$AntwoordTypeID
+  mylevels <- filter(df.AType, TypeID == myAType, !Level == "Weet niet")$Level
+  df.plot$Resp <- factor(df.plot$Resp, levels = mylevels, ordered = TRUE)
+  df.plot <- df.plot[order(df.plot$Resp),]
+  
+  n <- sum(df.plot$freq)
+  nNA <- filter(df.RespNA, jaar == myYear, Q == myQ)$freq
+  
+  myTitle <- paste(df.plot$VraagTitel[1], " \n(n = ", n, ", Weet niet = ", nNA, ")")
+
+  #labels
+  
+  df.plot$labely <- cumsum(df.plot$Percentage) - (0.5 * df.plot$Percentage)
+  
+  print(myQ)
+
+  myplot <- ggplot(arrange(df.plot, Resp),
+                   aes(x = Q, y = Percentage, fill = Resp, order = Resp)) + 
+    geom_bar(stat = 'identity') +
+    geom_text(aes(y = labely, label = round(Percentage, 0), )) +
+    scale_y_continuous("Percentage (%)") +
+    ggtitle(myTitle) +
+    coord_flip() + 
+    scale_fill_brewer(palette = 'RdYlGn') +
+    theme(axis.title.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+  print(myplot, )
+}
+
+Qlist <- cbind(df.Q[6:8,1], 2016)
+
+m_ply(.data = Qlist, .fun = PlotStackedAll)
+
+```
+
+
+# Stacked multiple years
+
+```{r fig.height=3}
+
+PlotStackedAll <- function(myQ) {
+
+  df.plot <- df.Respp %>%
+    filter(Q == myQ) %>%
+    dplyr::left_join(df.Q, by = c("Q" = "VraagID"))
+  
+  # Ook levels met 0 antwoorden moeten worden getoond
+  myAType <- filter(df.Q, VraagID == myQ)$AntwoordTypeID
+  mylevels <- filter(df.AType, TypeID == myAType, !Level == "Weet niet")$Level
+  df.plot$Resp <- factor(df.plot$Resp, levels = mylevels, ordered = TRUE)
+  df.plot <- df.plot[order(df.plot$Resp),]
+  
+  #n <- sum(df.plot$freq)
+  #nNA <- filter(df.RespNA, jaar == myYear, Q == myQ)$freq
+  
+  myTitle <- paste(df.plot$VraagTitel[1]) #, " \n(n = ", n, ", Weet niet = ", nNA, ")")
+
+  #labels
+  df.plot <- df.plot %>%
+    dplyr::group_by(jaar) %>%
+    dplyr::mutate(labely = cumsum(Percentage) - (0.5 * Percentage))
+  
+  print(myQ)
+
+  myplot <- ggplot(arrange(df.plot, Resp),
+                   aes(x = jaar, y = Percentage, fill = Resp, order = Resp)) + 
+    geom_bar(stat = 'identity') +
+    geom_text(aes(y = labely, label = round(Percentage, 0), )) +
+    scale_y_continuous("Percentage (%)") +
+    ggtitle(myTitle) +
+    coord_flip() + 
+    scale_fill_brewer(palette = 'RdYlGn') +
+    theme(axis.title.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+  print(myplot, )
+}
+
+Qlist <- cbind(df.Q[6:8,1], 2016)
+
+m_ply(.data = Qlist, .fun = PlotStackedAll)
+
+
+```
