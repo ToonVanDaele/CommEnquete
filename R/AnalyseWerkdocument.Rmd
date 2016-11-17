@@ -25,15 +25,21 @@ df.AType <- readRDS(file = paste0(path, "AType.Rdata"))
 
 ```
 
-# Aantal respondenten per categorie in 2016
+## Typering van de respondenten per categorie voor 2016
 
 ```{r aantallen per catetogrie, results='asis'}
 
 countTable <- function(Qn) { 
+  cat(df.Q[df.Q$VraagID == Qn,]$VraagTitel, "\n")
   df.Resp %>%
-    filter(Q == Qn, jaar == 2016 ) %>%
-    dplyr::count(Resp) %>%
+    dplyr::rename(Respons = Resp) %>%
+    dplyr::filter(Q == Qn) %>%
+    dplyr::group_by(jaar) %>%
+    dplyr::count(Respons) %>%
+    tidyr::spread(jaar, n) %>%
+    
     pandoc.table()
+  cat("\n")
 }
 
 countTable("Q1")
@@ -43,7 +49,7 @@ countTable("Q4")
 ```
 
 
-# Aantal respondenten per categorie gecombineerd 2016
+## Aantallen per unieke combinatie 2016
 
 ```{r results='asis'}
 Qcat <- c("Q1", "Q2", "Q3", "Q4")
@@ -55,10 +61,8 @@ Qcat <- c("Q1", "Q2", "Q3", "Q4")
 ```
 
 
-# Aantal antwoorden per vraag
-
 ```{r}
-
+# Aantal antwoorden per vraag
 df.Resp$jaar <- factor(df.Resp$jaar, levels = c(2016,2014,2012), ordered = TRUE)
 
 temp <- df.Resp %>%
@@ -80,15 +84,52 @@ colnames(df.RespNA)[3:4] <- c("Wn", "nWn")
 df.Respp <- dplyr::left_join(df.Respp, df.RespNA,by = c("jaar", "Q"))
 df.Respp$nWn[is.na(df.Respp$nWn)] <- 0
 
-summary(df.Respp) 
-head(df.Respp)
+#summary(df.Respp) 
+#head(df.Respp)
 
 ```
 
 
 # Stacked multiple years
 
-```{r fig.height=3}
+Legend
+
+```{r fig.height=0.7, fig.width=5}
+get_legend <- function(myplot){
+    tmp <- ggplot_gtable(ggplot_build(myplot))
+    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+    legend <- tmp$grobs[[leg]]
+    return(legend)
+}
+
+df.dummyplot <- data.frame(level = df.AType[df.AType$TypeID == "ANA", "Level"], y = 1)
+
+dummyplot <- ggplot(df.dummyplot, aes(x = level, y = y, fill = level)) + 
+    geom_bar(stat = 'identity') +
+    scale_fill_brewer(palette = 'RdYlGn') +
+    theme(legend.text = element_text(size = 8), 
+          legend.direction = "horizontal",
+          legend.position = "bottom")
+
+legendANA <- get_legend(dummyplot)
+
+plot(legendANA)
+
+
+df.dummyplot <- data.frame(level = df.AType[df.AType$TypeID == "GoedSlecht", "Level"], y = 1)
+
+dummyplot <- ggplot(df.dummyplot, aes(x = level, y = y, fill = level)) + 
+    geom_bar(stat = 'identity') +
+    scale_fill_brewer(palette = 'RdYlGn') +
+    theme(legend.direction = "horizontal", legend.position = "bottom")
+
+legendGoedSlecht <- get_legend(dummyplot)
+
+
+```
+
+
+```{r results = 'asis', fig.height=3}
 
 PlotStackedAll <- function(myQ) {
 
@@ -102,8 +143,10 @@ PlotStackedAll <- function(myQ) {
   df.plot$Resp <- factor(df.plot$Resp, levels = mylevels, ordered = TRUE)
   df.plot <- df.plot[order(df.plot$Resp, df.plot$jaar),]
   
-  myTitle <- paste(df.plot$VraagTitel[1], " \n ", df.plot$VraagTitelVervolg[1])
-  print(myTitle)
+  myMainTitle <- paste("#### ", myQ, ":", df.plot$VraagTitel[1], " \n ")
+  mySubTitle <- ifelse(df.plot$VraagTitelVervolg[1] == "Reactie", " ",
+                       df.plot$VraagTitelVervolg[1])
+  cat(myMainTitle, "\n")
   
   #labels
   df.plot <- df.plot %>%
@@ -112,22 +155,24 @@ PlotStackedAll <- function(myQ) {
   
   labelx <- unique(paste0(df.plot$jaar, "\n (n=", df.plot$sum, ") \n (NA=", df.plot$nWn))
   
-  print(myQ)
-
   myplot <- ggplot(arrange(df.plot, Resp),
                    aes(x = jaar, y = Percentage, fill = Resp, order = Resp)) + 
     geom_bar(stat = 'identity') +
     geom_text(aes(y = labely, label = round(Percentage, 0), )) +
     scale_y_continuous("Percentage (%)") +
     scale_x_discrete(labels = labelx) +
-    ggtitle(myTitle) +
+    ggtitle(mySubTitle) +
     coord_flip() + 
     scale_fill_brewer(palette = 'RdYlGn') +
     theme(axis.title.x = element_blank(),
         axis.ticks.x = element_blank())
 
-  print(myplot, )
+  print(myplot)
+  cat("  \n")
+  cat("  \n")
 }
+
+
 
 Qlist <- cbind(df.Q[6:8,1])
 
@@ -135,3 +180,6 @@ m_ply(.data = Qlist, .fun = PlotStackedAll)
 
 
 ```
+
+
+
