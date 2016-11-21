@@ -19,7 +19,7 @@ library(dplyr)
 library(readxl)
 
 # Load data
-path <- "C:/Users/toon_vandaele/toon.vandaele@inbo.be/Projecten/CommunicatieEnquete_analyse/data/"
+path <- "C:/Users/toon_vandaele/toon.vandaele@inbo.be/Project/CommunicatieEnquete_analyse/data/"
 
 # Lijst met vragen (alle vragen over enquetes heen)
 filename <- paste0(path, "Enquete_vragen.xlsx")
@@ -28,6 +28,7 @@ df.Q <- as.data.frame(readxl::read_excel(filename, col_names = TRUE))
 # Lijst met antwoordtypen en levels van antwoordtypen
 filename <- paste0(path, "Enquete_AntwoordType.xlsx")
 df.AType <- as.data.frame(readxl::read_excel(filename, col_names = TRUE))
+df.AType$Level <- factor(df.AType$Level)
 
 # Resultaten 2012 (lichtjes aangepaste output uit SurveyMonkey)
 filename <- paste0(path, "Resultaten enquête interne communicatie_2012_mod.xls")
@@ -57,7 +58,7 @@ df.2016flat <- df.2016 %>%
 df.Resp <- rbind(df.2012flat, df.2014flat, df.2016flat)
 
 # Wegschrijven van de resultaten
-saveRDS(df.Resp, file = paste0(path, "Resp.Rdata"))
-saveRDS(df.Q, file = paste0(path, "Q.Rdata"))
-saveRDS(df.AType, file = paste0(path, "AType.Rdata"))
+saveRDS(df.Resp, file = "Resp.Rdata")
+saveRDS(df.Q, file = "Q.Rdata")
+saveRDS(df.AType, file = "AType.Rdata")
 

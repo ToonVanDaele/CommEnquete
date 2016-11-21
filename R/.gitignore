@@ -1,3 +1,5 @@
-AnalyseWerkdocument.html
-AnalyseWerkdocument.pdf
-AnalyseWerkdocument.docx
+*.html
+*.pdf
+*.docx
+*.Rdata
+*.Rmd
