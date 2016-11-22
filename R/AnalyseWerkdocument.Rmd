@@ -15,17 +15,18 @@ library(ggplot2)
 ```
 
 ```{r load data}
-path <- "C:/Users/toon_vandaele/toon.vandaele@inbo.be/Project/CommunicatieEnquete_analyse/data/"
-df.Resp <- readRDS(file = paste0(path, "Resp.Rdata"))
-df.Q <- readRDS(file = paste0(path, "Q.Rdata"))
-df.AType <- readRDS(file = paste0(path, "AType.Rdata"))
+df.Resp <- readRDS("Resp.Rdata")
+df.Q <- readRDS("Q.Rdata")
+df.AType <- readRDS("AType.Rdata")
 ```
 
 ## Typering van de respondenten per categorie
 
+De cijfers in de tabellen zijn aantallen
+
 ```{r aantallen per catetogrie, results='asis'}
 countTable <- function(Qn) { 
-  cat(df.Q[df.Q$VraagID == Qn,]$VraagTitel, "\n")
+  cat("  \n### ", df.Q[df.Q$VraagID == Qn,]$VraagTitel, "  \n")
   df.Resp %>%
     dplyr::rename(Respons = Resp) %>%
     dplyr::filter(Q == Qn) %>%
@@ -33,19 +34,16 @@ countTable <- function(Qn) {
     dplyr::count(Respons) %>%
     tidyr::spread(jaar, n) %>%
     pandoc.table()
-  cat("\n")
+  cat("  \n")
 }
 
-countTable("Q1")
-countTable("Q2")
-countTable("Q3")
-countTable("Q4")
+Qcat <- c("Q1", "Q2", "Q3", "Q4")
+for (i in Qcat) countTable(i)
 ```
 
 ## Aantallen per unieke combinatie 2016
 
 ```{r results='asis'}
-Qcat <- c("Q1", "Q2", "Q3", "Q4")
   df.Resp %>% 
   filter(jaar == 2016, Q %in% Qcat) %>%
   spread(key = Q, value = Resp) %>%
@@ -82,7 +80,7 @@ df.Respp <- dplyr::left_join(df.Respp, df.AType, by = c("Resp" = "Level"))
 df.Score <- df.Respp %>%
   dplyr::filter(TypeID == "ANA") %>%
   dplyr::group_by(jaar, Q) %>%
-  dplyr::summarise(Index = round(mean(Score * Percentage), 0))
+  dplyr::summarise(Index = round(mean(Score * Percentage), 1))
 ```
 
 ```{r fig.height=0.7, fig.width=5}
@@ -114,26 +112,24 @@ create_legend <- function(LegendType, df.AType) {
   return(mylegend)
 }
 
-legendType <- list(ANA = create_legend("ANA", df.AType),
-                   GoedSlecht = create_legend("GoedSlecht", df.AType))
-
-#grid::grid.draw(legendType[["ANA"]])
+legendlist <- unique(df.AType$TypeID)
+legendType <- mlply(.data = legendlist, .fun = create_legend, df.AType)
+names(legendType) <- legendlist
 ```
 
 ```{r }
-PlotStackedAll <- function(myQ) {
+PlotStackedAll <- function(VraagID, AntwoordTypeID, pAID) {
 
   df.plot <- df.Respp %>%
-    filter(Q == myQ) %>%
+    filter(Q == VraagID) %>%
     dplyr::left_join(df.Q, by = c("Q" = "VraagID"))
   
   # Ook levels met 0 antwoorden moeten worden getoond
-  myAType <- filter(df.Q, VraagID == myQ)$AntwoordTypeID
-  mylevels <- filter(df.AType, TypeID == myAType, !Level == "Weet niet")$Level
+  mylevels <- filter(df.AType, TypeID == AntwoordTypeID, !Level == "Weet niet")$Level
   df.plot$Resp <- factor(df.plot$Resp, levels = mylevels, ordered = TRUE)
   df.plot <- df.plot[order(df.plot$Resp, df.plot$jaar),]
     
-  myMainTitle <- paste(myQ, ":", df.plot$VraagTitel[1])
+  myMainTitle <- paste(VraagID, ":", df.plot$VraagTitel[1])
   mySubTitle <- ifelse(df.plot$VraagTitelVervolg[1] == "Reactie", " ",
                        df.plot$VraagTitelVervolg[1])
 
@@ -159,29 +155,31 @@ PlotStackedAll <- function(myQ) {
         axis.text.y = element_text(vjust = 0.8, face = 'bold'))
 
   # Output
+  cat("  \n### ", myMainTitle, "  \n")
   
-  cat("\n")
-  cat("### ", myMainTitle, "\n")
-  grid::grid.draw(myplot)
-  cat("\n")
- 
+  if (AntwoordTypeID == pAID) {
+    gridExtra::grid.arrange(myplot)
+  }else{
+    gridExtra::grid.arrange(legendType[[AntwoordTypeID]], myplot)
+  }
+
+  cat("  \r\n")
+  
   df.Score %>%
-    filter(Q == myQ) %>%
+    filter(Q == VraagID) %>%
     select(jaar, Index) %>%
     dplyr::arrange(desc(jaar)) %>%
     t() %>%
-    pander::pandoc.table()
- 
-  cat("\n")
-  grid::grid.draw(legendType[["ANA"]])
-  cat("\n")
-  
+    pander::pandoc.table(style = "multiline", emphasize.strong.rows = 2)
+  cat("  \n")
 }
 ```
 
 # Responses
 
-```{r results = 'asis', fig.height=2}
-Qlist <- cbind(df.Q[8:10,1])
+```{r results = 'asis', fig.height=5, fig.width = 15}
+Qlist <- df.Q[33:34,c("VraagID", "AntwoordTypeID")]
+Qlist$pAID <- "none"
+Qlist[2:nrow(Qlist),]$pAID <- Qlist[1:(nrow(Qlist) - 1),]$AntwoordTypeID
 m_ply(.data = Qlist, .fun = PlotStackedAll)
 ```
