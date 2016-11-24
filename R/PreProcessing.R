@@ -57,6 +57,13 @@ df.2016flat <- df.2016 %>%
 # Samenvoegen van de resultaten
 df.Resp <- rbind(df.2012flat, df.2014flat, df.2016flat)
 
+# Aantallen per unieke combinatie 2016
+Qcat <- c("Q1", "Q2", "Q3", "Q4")
+df.Resp %>%
+  dplyr::filter(jaar == 2016, Q %in% Qcat) %>%
+  tidyr::spread(key = Q, value = Resp) %>%
+  plyr::count(vars = Qcat)
+
 # Wegschrijven van de resultaten
 saveRDS(df.Resp, file = "Resp.Rdata")
 saveRDS(df.Q, file = "Q.Rdata")
