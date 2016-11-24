@@ -12,6 +12,7 @@ library(dplyr)
 library(tidyr)
 library(pander)
 library(ggplot2)
+library(grid)
 library(gridExtra)
 ```
 
@@ -23,24 +24,6 @@ df.AType <- readRDS("AType.Rdata")
 
 ## Typering van de respondenten per categorie
 
-De cijfers in de tabellen zijn aantallen
-
-```{r aantallen per categorie, results='asis'}
-countTable <- function(Qn) { 
-  cat("  \n### ", df.Q[df.Q$VraagID == Qn,]$VraagTitel, "  \n")
-  df.Resp %>%
-    dplyr::rename(Respons = Resp) %>%
-    dplyr::filter(Q == Qn) %>%
-    dplyr::group_by(jaar) %>%
-    dplyr::count(Respons) %>%
-    tidyr::spread(jaar, n) %>%
-    pandoc.table()
-  cat("  \n")
-}
-
-Qcat <- c("Q1", "Q2", "Q3", "Q4")
-for (i in Qcat) countTable(i)
-```
 
 ```{r}
 # Samenvatting van alle antwoorden per vraag
@@ -52,10 +35,10 @@ temp <- df.Resp %>%
 
 tmpsum <- temp %>%
   dplyr::group_by(Q, jaar) %>%
-  summarise(sum = sum(freq))
+  summarise(nresp = sum(freq))
 
 df.Respp <- dplyr::left_join(temp, tmpsum, by = c("jaar", "Q"))
-df.Respp$Percentage <- df.Respp$freq / df.Respp$sum * 100
+df.Respp$Percentage <- df.Respp$freq / df.Respp$nresp * 100
 
 df.RespNA <- df.Resp %>%
   dplyr::filter(Resp == "Weet niet") %>%
@@ -69,14 +52,36 @@ df.Respp <- dplyr::left_join(df.Respp, df.AType, by = c("AntwoordTypeID" = "Type
                                                         "Resp" = "Level"))
 ```
 
+De cijfers in de tabellen zijn aantallen
+
+```{r aantallen per categorie, results='asis'}
+countTable <- function(Qn) { 
+  cat("  \n### ", df.Q[df.Q$VraagID == Qn,]$VraagTitel, "  \n")
+  df.Resp %>%
+    dplyr::rename(Respons = Resp) %>%
+    dplyr::filter(Q == Qn) %>%
+    dplyr::group_by(jaar) %>%
+    dplyr::count(Respons) %>%
+    tidyr::spread(jaar, n) %>%
+    pandoc.table()
+  cat("  \n\n")
+}
+
+Qcat <- c("Q1", "Q2", "Q3", "Q4")
+for (i in Qcat) countTable(i)
+```
+
+
 ```{r scores}
 df.Score <- df.Respp %>%
   dplyr::filter(AntwoordTypeID == "ANA" | AntwoordTypeID == "GoedSlecht" | AntwoordTypeID == "Belang") %>%
   dplyr::group_by(jaar, Q) %>%
-  dplyr::summarise(Index = round(mean(Score * Percentage), 1))
+  dplyr::summarise(sumscore = sum(Score * freq), nresp = first(nresp)) %>%
+  dplyr::ungroup(jaar) %>%
+  dplyr::transmute(jaar, Q, Index = round((sumscore - nresp) / (nresp * 4) * 100,1))
 ```
 
-```{r fig.height=0.7, fig.width=5}
+```{r legend types}
 get_legend <- function(myplot){
     tmp <- ggplot_gtable(ggplot_build(myplot))
     leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
@@ -96,7 +101,7 @@ create_legend <- function(LegendType, df.AType) {
       geom_bar(stat = 'identity') +
       scale_fill_brewer(palette = 'RdYlGn') +
       labs(fill = "") +
-      theme(legend.text = element_text(size = 8),
+      theme(legend.text = element_text(size = 20),
             legend.direction = "horizontal",
             legend.background =  element_rect(colour = "black"))
   
@@ -107,17 +112,20 @@ create_legend <- function(LegendType, df.AType) {
 legendlist <- unique(df.AType$TypeID)
 legendType <- mlply(.data = legendlist, .fun = create_legend, df.AType)
 names(legendType) <- legendlist
+
+emptygrob <- textGrob(" ")
 ```
 
 ```{r }
 PlotStackedAll <- function(VraagID, AntwoordTypeID, pAID) {
 
   # Ook levels met 0 antwoorden moeten worden getoond
-  mylevels <- filter(df.AType, TypeID == AntwoordTypeID, !Level == "Weet niet")$Level
+  mylevels <- df.AType %>%
+    dplyr::filter(TypeID == AntwoordTypeID, !Level == "Weet niet") %>%
+    dplyr::arrange(desc(Sort))
 
   df.plot <- filter(df.Respp, Q == VraagID)
-  df.plot$Resp <- factor(df.plot$Resp, levels = mylevels, ordered = TRUE)
-  df.plot <- df.plot[order(df.plot$Resp, df.plot$jaar),]
+  df.plot$Resp <- factor(df.plot$Resp, levels = mylevels$Level,  ordered = TRUE)
     
   myMainTitle <- paste(VraagID, ":", df.plot$VraagTitel[1], 
                        ifelse(df.plot$VraagTitelVervolg[1] == "Reactie", "",
@@ -126,15 +134,24 @@ PlotStackedAll <- function(VraagID, AntwoordTypeID, pAID) {
   #labels
   df.plot <- df.plot %>%
     dplyr::group_by(jaar) %>%
-    dplyr::arrange(desc(Sort.y)) %>%
+    dplyr::arrange(jaar, Sort.y) %>%
     dplyr::mutate(labely = cumsum(Percentage) - (0.5 * Percentage))
 
-  labelx <- unique(paste0(df.plot$jaar, "\n (n=", df.plot$sum, ") \n (NA=", df.plot$nWn))
+  labelx <- unique(paste0(df.plot$jaar, "\n (n =", df.plot$nresp, ") \n (weet niet =",
+                          df.plot$nWn, ")"))
   
-  myplot <- ggplot(arrange(df.plot, Resp),
-                   aes(x = jaar, y = Percentage, fill = Resp)) + 
-    geom_bar(stat = 'identity') +
-    geom_text(aes(y = labely, label = round(Percentage, 0))) +
+  cat("  \n")
+
+  if (!AntwoordTypeID == pAID) {
+    gridExtra::grid.arrange(emptygrob, legendType[[AntwoordTypeID]], nrow = 2)
+    cat("  \n")
+  }
+  
+  cat("  \n### ", myMainTitle, "  \n")
+  
+  myplot <- ggplot(df.plot, aes(x = jaar, y = Percentage)) + 
+    geom_bar(aes(fill = Resp), stat = 'identity') +
+    geom_text(aes(y = labely, label = round(Percentage, 0), size = 20)) +
     scale_y_continuous("Percentage (%)", expand = c(0,1)) +
     scale_x_discrete(labels = labelx, expand = c(0,0)) +
     coord_flip() +
@@ -144,44 +161,49 @@ PlotStackedAll <- function(VraagID, AntwoordTypeID, pAID) {
           axis.ticks.x = element_blank(),
           legend.position = "none",
           axis.text.y = element_text(vjust = 0.8, face = 'bold'),
-          plot.margin = unit(c(.1,.1,.1,.1), "cm"),
-          text = element_text(size = 16))
+          plot.margin = unit(c(.1,.2,.1,.1), "cm"),
+          text = element_text(face = 'bold', size = 22))
 
-  
-  
   if (AntwoordTypeID == "ANA" | AntwoordTypeID == "GoedSlecht" | AntwoordTypeID == "Belang") {
     ScoreTable <- df.Score %>%
                     filter(Q == VraagID) %>%
                     select(jaar, Index) %>%
-                    dplyr::arrange(desc(jaar))}
+                    dplyr::arrange(jaar)
         
-  myscoreplot <- ggplot(ScoreTable, aes(x = jaar, y = 1)) + geom_point(colour = "white") +
-    scale_x_discrete(labels = ScoreTable$Index) +
-    coord_flip() +
-    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-          panel.background = element_blank(),
-          axis.title = element_blank(),
-          axis.ticks = element_blank(),
-          axis.text.x = element_blank(),
-          axis.text.y = element_text(face = 'bold'))
+    myscoreplot <- ggplot(ScoreTable, aes(x = jaar, y = 1)) + 
+      geom_point(colour = "white") +
+      scale_x_discrete(position = "top", labels = ScoreTable$Index) +
+      coord_flip() + xlab("Index") +
+      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+            panel.background = element_blank(),
+            plot.margin = unit(c(.1,5,.1,.1), "cm"),
+            axis.ticks = element_blank(),
+            axis.text.x = element_blank(),
+            axis.title.x = element_blank(),
+            text = element_text(face = 'bold', size = 20))
 
-  # Output
-  cat("  \n")
-  if (!AntwoordTypeID == pAID) {
-    gridExtra::grid.arrange(legendType[[AntwoordTypeID]])
-    cat("  \n")
-        }
+    if (length(labelx) == 1) {
+      grid.arrange(emptygrob, emptygrob,
+                   myplot, myscoreplot, 
+                   emptygrob, emptygrob, ncol = 2, nrow = 3, widths = c(10,1) )  
+    } else {
+      grid.arrange(myplot, myscoreplot, ncol = 2, nrow = 1, widths = c(10,1) )  
+    }
+    
+    
+  }else{
+    grid.arrange(myplot, ncol = 2, widths = c(10,1) )
+  }
   
-  cat("  \n### ", myMainTitle, "  \n")
-  grid.arrange(myplot, myscoreplot, ncol = 2, widths = c(10,1) )
-  cat("  \r\n")
+  cat("  \r\n  \n")
 }
 ```
 
 # Responses
 
 ```{r results = 'asis', fig.height=5, fig.width=15, message=FALSE, warning=FALSE}
-Qlist <- df.Q[15:17,c("VraagID", "AntwoordTypeID")]
+Qlist <- df.Q[!df.Q$VraagID %in% Qcat & !df.Q$VraagID == "Q56",c("VraagID", "AntwoordTypeID")]
+Qlist <- Qlist[1:5,]
 Qlist$pAID <- "none"
 Qlist[2:nrow(Qlist),]$pAID <- Qlist[1:(nrow(Qlist) - 1),]$AntwoordTypeID
 m_ply(.data = Qlist, .fun = PlotStackedAll)
@@ -189,7 +211,4 @@ m_ply(.data = Qlist, .fun = PlotStackedAll)
 
 ### Todo:
 
-* score herbekijken (min / max herschalen tussen 0 en 100)
 * legende groter maken
-* alle cijfers in figuur moeten groter
-
