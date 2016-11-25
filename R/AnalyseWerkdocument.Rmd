@@ -2,7 +2,7 @@
 title: "Resultaten enquete interne communicatie 2016"
 author: "Irina de Landsheer & Toon Van Daele"
 date: "29 augustus 2016"
-output: pdf_document
+output: word_document
 ---
 
 ```{r setup, include=FALSE}
@@ -33,7 +33,7 @@ df.respp <- df.resp %>%
   dplyr::mutate(percentage = 100 * n/sum(n)) %>%
   dplyr::left_join(df.Q, by = c("Q" = "VraagID")) %>%
   dplyr::left_join(df.AType, by = c("AntwoordTypeID" = "TypeID", "Resp" = "Level")) %>%
-  dplyr::select(jaar, Q, Resp, n, percentage, Sort = Sort.x, Score)
+  dplyr::select(jaar, Q, Resp, n, percentage, ATypeID = AntwoordTypeID, Sort = Sort.y, Score)
 
 df.weetniet <- df.resp %>%
   dplyr::filter(Resp == "Weet niet") %>%
@@ -41,7 +41,7 @@ df.weetniet <- df.resp %>%
   dplyr::summarise(weetniet = n())
 
 df.Score <- df.respp %>%
-  dplyr::filter(TypeID %in% c("ANA", "GoedSlecht", "Belang")) %>%
+  dplyr::filter(ATypeID %in% c("ANA", "GoedSlecht", "Belang")) %>%
   dplyr::summarise(sumscore = sum(Score * n), nresp = sum(n)) %>%
   dplyr::ungroup(jaar, Q) %>%
   dplyr::transmute(jaar, Q, nresp, Index = round((sumscore - nresp) / (nresp * 4) * 100,1)) %>%
@@ -120,7 +120,7 @@ PlotStackedAll <- function(QID, ATypeID, VraagTitel, VraagTitelVervolg, pAID) {
 ```{r include=FALSE, fig.height=3.5, fig.width=15, message=TRUE, warning=TRUE}
 df.Ql <- filter(df.Q, !VraagID %in% Qcat & !VraagID == "Q56") %>%
   select(QID = VraagID, ATypeID = AntwoordTypeID, VraagTitel, VraagTitelVervolg)
-#df.Ql <- df.Ql[30:45,]  # Dient enkel om te testen
+#df.Ql <- df.Ql[10:15,]  # Dient enkel om te testen
 df.Ql$pAID <- "none"
 df.Ql[2:nrow(df.Ql),]$pAID <- df.Ql[1:(nrow(df.Ql) - 1),]$ATypeID
 
@@ -140,9 +140,7 @@ for (i in 1:nrow(df.Ql)) {
     dplyr::select(jaar) %>%
     dplyr::n_distinct()
   fig_height <- nbjaar
-  
-  cat(fig_height, "\n")
-  
+
   if (!ATypeID == pAID) {
     output <- c(output,knitr::knit_child("LegendChild.Rmd"))
     cat("  \n")
