@@ -1,0 +1,17 @@
+---
+title: "LegendChild"
+author: "Toon Van Daele"
+date: "25 november 2016"
+output: html_document
+---
+
+
+```{r results='asis', fig.width = 15, fig.heigth = 1}
+
+  gridExtra::grid.arrange(textGrob(" "), legendType[[ATypeID]])
+
+  cat("  \n")
+
+
+```
+

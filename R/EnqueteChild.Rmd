@@ -1,0 +1,70 @@
+---
+title: "EnqueteChild"
+author: "Toon Van Daele"
+date: "25 november 2016"
+output: html_document
+
+---
+
+### `r QID`: `r VraagTitel` `r VraagTitelVervolg`
+
+```{r results='asis', fig.width = 15, fig.height = {{fig_height}}}
+
+#labels x-axis
+lx <- dplyr::filter(df.Score, Q == QID)
+labelx <- unique(paste0(lx$jaar, "\n (n =", lx$nresp, ") \n (weet niet =", lx$weetniet, ")"))
+
+#Select QID and calculate label positions in bars
+df.plot <- df.respp %>%
+  dplyr::filter(Q == QID) %>%
+  dplyr::group_by(jaar) %>%
+  dplyr::arrange(jaar, Sort) %>%
+  dplyr::mutate(labely = cumsum(percentage) - 0.5 * percentage)
+df.plot$Resp <- factor(df.plot$Resp, levels = unique(df.plot[order(df.plot$Sort, decreasing = TRUE),]$Resp))
+
+myplot <- ggplot(df.plot, aes(x = as.factor(jaar), y = percentage)) +
+  geom_bar(aes(fill = Resp), stat = 'identity') +
+  geom_text(aes(y = labely, label = round(percentage, 0), size = 20)) +
+  scale_y_continuous("Percentage (%)", expand = c(0,1)) +
+  scale_x_discrete(labels = labelx, expand = c(0,0)) +
+  coord_flip() +
+  xlab("Jaar") +
+  scale_fill_brewer(palette = 'RdYlGn', direction = -1) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position = "none",
+        axis.text.y = element_text(vjust = 0.8, face = 'bold'),
+        text = element_text(face = 'bold', size = 22))
+
+if (ATypeID %in% c("ANA", "GoedSlecht", "Belang")) {
+  ScoreTable <- df.Score %>%
+                  filter(Q == QID) %>%
+                  select(jaar, Index) %>%
+                  dplyr::arrange(jaar)
+
+  myscoreplot <- ggplot(ScoreTable, aes(x = as.factor(jaar), y = 1)) +
+    geom_bar(fill = "white", stat = 'identity') +
+    scale_x_discrete(position = "top", labels = ScoreTable$Index) +
+    coord_flip() + xlab("Index") +
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          panel.background = element_blank(),
+          axis.ticks = element_blank(),
+          axis.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          text = element_text(face = 'bold', size = 20))
+
+
+   grid.arrange(myplot, myscoreplot, ncol = 2, nrow = 1, widths = c(10,1))
+
+ }else{
+
+  grid.arrange(myplot, ncol = 2, widths = c(10,1) )
+}
+
+cat("  \n")
+
+```
+
+
+  

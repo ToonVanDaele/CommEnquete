@@ -28,7 +28,6 @@ df.Q <- as.data.frame(readxl::read_excel(filename, col_names = TRUE))
 # Lijst met antwoordtypen en levels van antwoordtypen
 filename <- paste0(path, "Enquete_AntwoordType.xlsx")
 df.AType <- as.data.frame(readxl::read_excel(filename, col_names = TRUE))
-df.AType$Level <- factor(df.AType$Level)
 
 # Resultaten 2012 (lichtjes aangepaste output uit SurveyMonkey)
 filename <- paste0(path, "Resultaten enquête interne communicatie_2012_mod.xls")
