@@ -6,6 +6,8 @@ output: html_document
 ---
 
 
+\newpage
+
 ```{r results='asis', fig.width = 15, fig.heigth = 1}
 
   gridExtra::grid.arrange(textGrob(" "), legendType[[ATypeID]])

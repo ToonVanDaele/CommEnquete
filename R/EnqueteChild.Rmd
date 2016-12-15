@@ -2,8 +2,7 @@
 title: "EnqueteChild"
 author: "Toon Van Daele"
 date: "25 november 2016"
-output: html_document
-
+output: word_document
 ---
 
 ### `r QID`: `r VraagTitel` `r VraagTitelVervolg`
@@ -12,6 +11,7 @@ output: html_document
 
 #labels x-axis
 lx <- dplyr::filter(df.Score, Q == QID)
+lx$weetniet[is.na(lx$weetniet)] <- 0
 labelx <- unique(paste0(lx$jaar, "\n (n =", lx$nresp, ") \n (weet niet =", lx$weetniet, ")"))
 
 #Select QID and calculate label positions in bars
@@ -53,7 +53,6 @@ if (ATypeID %in% c("ANA", "GoedSlecht", "Belang")) {
           axis.text.x = element_blank(),
           axis.title.x = element_blank(),
           text = element_text(face = 'bold', size = 20))
-
 
    grid.arrange(myplot, myscoreplot, ncol = 2, nrow = 1, widths = c(10,1))
 

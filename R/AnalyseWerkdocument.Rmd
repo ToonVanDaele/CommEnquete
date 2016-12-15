@@ -1,6 +1,6 @@
 ---
 title: "Resultaten enquete interne communicatie 2016"
-author: "Irina de Landsheer & Toon Van Daele"
+author: "Irina de Landsheer, Toon Van Daele & Pieter Verschelde"
 date: "29 augustus 2016"
 output: word_document
 ---
@@ -41,11 +41,24 @@ df.weetniet <- df.resp %>%
   dplyr::summarise(weetniet = n())
 
 df.Score <- df.respp %>%
-  dplyr::filter(ATypeID %in% c("ANA", "GoedSlecht", "Belang")) %>%
+  dplyr::filter(ATypeID %in% c("ANA", "GoedSlecht", "Belang", "JaNee")) %>%
   dplyr::summarise(sumscore = sum(Score * n), nresp = sum(n)) %>%
   dplyr::ungroup(jaar, Q) %>%
   dplyr::transmute(jaar, Q, nresp, Index = round((sumscore - nresp) / (nresp * 4) * 100,1)) %>%
   dplyr::left_join(df.weetniet, by = c("jaar" = "jaar", "Q" = "Q"))
+```
+
+## Aantal respondenten
+
+```{r results='asis'}
+df.temp <- df.resp %>%
+  filter(Q == "Q1") %>%
+  group_by(jaar) %>%
+  summarise(n = n()) %>%
+  tidyr::spread(jaar, n)
+df.temp <- as.data.frame(df.temp)
+rownames(df.temp) <- "Aantal respondenten"
+pandoc.table(df.temp)
 ```
 
 ## Typering van de respondenten per categorie
@@ -120,7 +133,7 @@ PlotStackedAll <- function(QID, ATypeID, VraagTitel, VraagTitelVervolg, pAID) {
 ```{r include=FALSE, fig.height=3.5, fig.width=15, message=TRUE, warning=TRUE}
 df.Ql <- filter(df.Q, !VraagID %in% Qcat & !VraagID == "Q56") %>%
   select(QID = VraagID, ATypeID = AntwoordTypeID, VraagTitel, VraagTitelVervolg)
-#df.Ql <- df.Ql[10:15,]  # Dient enkel om te testen
+#df.Ql <- df.Ql[df.Ql$QID %in% c("Q27", "Q28"),]  # Dient enkel om te testen
 df.Ql$pAID <- "none"
 df.Ql[2:nrow(df.Ql),]$pAID <- df.Ql[1:(nrow(df.Ql) - 1),]$ATypeID
 
@@ -153,7 +166,7 @@ for (i in 1:nrow(df.Ql)) {
 #output <- mlply(.data = df.Ql, .fun = PlotStackedAll)
 #output.knit <- knitr::knit_child(text = unlist(output), quiet = TRUE)
 #cat(output.knit)
-
+#`r cat(output, collapse='\n')`
 ```
 
 `r paste(output, collapse='\n')`
