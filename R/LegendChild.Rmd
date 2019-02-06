@@ -2,7 +2,10 @@
 title: "LegendChild"
 author: "Toon Van Daele"
 date: "25 november 2016"
-output: html_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 
@@ -10,7 +13,7 @@ output: html_document
 
 ```{r results='asis', fig.width = 15, fig.heigth = 1}
 
-  gridExtra::grid.arrange(textGrob(" "), legendType[[ATypeID]])
+  gridExtra::grid.arrange(grid::textGrob(" "), legendType[[ATypeID]])
 
   cat("  \n")
 

@@ -2,7 +2,9 @@
 title: "EnqueteChild"
 author: "Toon Van Daele"
 date: "25 november 2016"
-output: word_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ### `r QID`: `r VraagTitel` `r VraagTitelVervolg`
