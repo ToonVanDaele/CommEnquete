@@ -94,22 +94,16 @@ df.resp <- mutate(df.resp,
 #Totaal niet belangrijk, Niet belangrijk, Neutraal, Belangrijk, Heel belangrijk
 #Onbelangrijk, Eerder onbelangrijk, Noch belangrijk, noch onbelangrijk, Eerder belangrijk, Belangrijk
 df.resp <- df.resp %>%
-  mutate(Resp = ifelse((jaar == 2012 | jaar == 2014) &
-                         Resp == "Totaal niet belangrijk",
+  mutate(Resp = ifelse(jaar < 2018 & Resp == "Totaal niet belangrijk",
                        "Onbelangrijk", Resp)) %>%
-  mutate(Resp = ifelse((jaar == 2012 | jaar == 2014) &
-                         Resp == "Niet belangrijk",
+  mutate(Resp = ifelse(jaar <- 2018 & Resp == "Niet belangrijk",
                       "Eerder onbelangrijk", Resp)) %>%
-  mutate(Resp = ifelse((jaar == 2012 | jaar == 2014) &
-                         Resp == "Neutraal",
+  mutate(Resp = ifelse(jaar < 2018 & Resp == "Neutraal",
                     "Noch belangrijk, noch onbelangrijk", Resp)) %>%
-  mutate(Resp = ifelse((jaar == 2012 | jaar == 2014) &
-                         Resp == "Belangrijk",
+  mutate(Resp = ifelse(jaar < 2018 & Resp == "Belangrijk",
                         "Eerder belangrijk", Resp)) %>%
-  mutate(Resp = ifelse((jaar == 2012 | jaar == 2014) &
-                         Resp == "Heel belangrijk",
+  mutate(Resp = ifelse(jaar < 2018 & Resp == "Heel belangrijk",
                                  "Belangrijk", Resp))
-
 
 # In 2018 is er een andere indeling in beoordelingen voor de vragen
 # over 'ik vind mijn weg naar...".

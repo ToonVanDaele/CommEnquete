@@ -131,10 +131,13 @@ PlotStackedAll <- function(QID, ATypeID, VraagTitel, VraagTitelVervolg, pAID) {
 # Responses
 
 ```{r include=FALSE, fig.height=3.5, fig.width=15, message=TRUE, warning=TRUE}
-df.Ql <- filter(df.Q, Export == "Ja" & !VraagID %in% Qcat & !VraagID == "Q56") %>%
-  select(QID = VraagID, ATypeID = AntwoordTypeID, VraagTitel, VraagTitelVervolg)
-df.Ql <- slice(df.Ql, 30:40) # om te testen
-#df.Ql <- df.Ql[df.Ql$QID %in% c("Q25", "Q26", "Q29", "Q27", "Q28", "Q96", "Q97"),]  # Dient enkel om te testen
+df.Ql <- filter(df.Q, Export == "Ja" & !VraagID %in% Qcat & !VraagID == "Q56" &
+                  !VraagID == "Q95") %>%
+  select(QID = VraagID, ATypeID = AntwoordTypeID, VraagTitel,
+         VraagTitelVervolg, Sort) %>%
+  arrange(Sort)
+#df.Ql <- slice(df.Ql, 45:46) # om te testen
+#df.Ql <- df.Ql[df.Ql$QID %in% c("Q25", "Q97"),]  # Dient enkel om te testen
 df.Ql$pAID <- "none"
 df.Ql[2:nrow(df.Ql),]$pAID <- df.Ql[1:(nrow(df.Ql) - 1),]$ATypeID
 
