@@ -60,7 +60,7 @@ rownames(df.temp) <- "Aantal respondenten"
 pandoc.table(df.temp)
 ```
 
-## Typering van de respondenten per categorie
+## Typering van de respondenten
 
 (De cijfers in de tabellen zijn aantal respondenten)
 
@@ -76,9 +76,7 @@ countTable <- function(Qn) {
   cat("  \n\n")
 }
 
-Qcat <- c("Q1", "Q2", "Q3", "Q4")
-Qcat2018 <- Qcat <- c("Q2", "Q3")
-for (i in Qcat2018) countTable(i)
+for (i in c("Q2", "Q3")) countTable(i)
 ```
 
 ```{r legend types}
@@ -114,43 +112,27 @@ legendType <- plyr::mlply(.data = legendlist, .fun = create_legend, df.AType)
 names(legendType) <- legendlist
 ```
 
-```{r results='asis'}
-PlotStackedAll <- function(QID, ATypeID, VraagTitel, VraagTitelVervolg, pAID) {
-
-  VraagTitelVervolg <- ifelse(VraagTitelVervolg == "Reactie", "", VraagTitelVervolg)
-  fig_height <- nrow(subset(df.Score, Q == QID))
-  
-  if (!ATypeID == pAID) {
-    output <- c(output,knitr::knit_child("LegendChild.Rmd"))
-    cat("  \n")
-  }
-  output <- c(output,knitr::knit_child("EnqueteChild.Rmd"))
-}
-```
-
 # Responses
 
 ```{r include=FALSE, fig.height=3.5, fig.width=15, message=TRUE, warning=TRUE}
-df.Ql <- filter(df.Q, Export == "Ja" & !VraagID %in% Qcat & !VraagID == "Q56" &
-                  !VraagID == "Q95") %>%
-  select(QID = VraagID, ATypeID = AntwoordTypeID, VraagTitel,
+df.Ql <- filter(df.Q, Export == "Ja" &
+                  !VraagID %in% c("Q1", "Q2", "Q3", "Q4", "Q56","Q95")) %>%
+         select(QID = VraagID, ATypeID = AntwoordTypeID, VraagTitel,
          VraagTitelVervolg, Sort) %>%
-  arrange(Sort)
+         arrange(Sort)
 #df.Ql <- slice(df.Ql, 45:46) # om te testen
 #df.Ql <- df.Ql[df.Ql$QID %in% c("Q25", "Q97"),]  # Dient enkel om te testen
-df.Ql$pAID <- "none"
-df.Ql[2:nrow(df.Ql),]$pAID <- df.Ql[1:(nrow(df.Ql) - 1),]$ATypeID
 
+prevATypeID <- "none"
+prevVraagTitel <- "none"
 output <- NULL
 
 for (i in 1:nrow(df.Ql)) {
   
   QID <- df.Ql[i,"QID"]
   ATypeID <- df.Ql[i,"ATypeID"]
-  pAID <- df.Ql[i,"pAID"]
   VraagTitel <- df.Ql[i,"VraagTitel"]
   VraagTitelVervolg <- df.Ql[i,"VraagTitelVervolg"]
-  VraagTitelVervolg <- ifelse(VraagTitelVervolg == "Reactie", "", VraagTitelVervolg)
   nbjaar <- df.respp %>% 
     dplyr::filter(Q == QID) %>%
     dplyr::ungroup(Q) %>%
@@ -158,19 +140,22 @@ for (i in 1:nrow(df.Ql)) {
     dplyr::n_distinct()
   fig_height <- nbjaar
 
-  if (!ATypeID == pAID) {
+  if (!VraagTitel == prevVraagTitel) {
+    output <- c(output, knitr::knit_child("TitleQuestionChild.Rmd"))
+    cat("  \n")
+  }
+  
+  if (!ATypeID == prevATypeID) {
     output <- c(output, knitr::knit_child("LegendChild.Rmd"))
     cat("  \n")
   }
 
   output <- c(output,knitr::knit_child("EnqueteChild.Rmd"))
-  
+  prevATypeID <- ATypeID
+  prevVraagTitel <- VraagTitel
+    
 }
 
-#output <- mlply(.data = df.Ql, .fun = PlotStackedAll)
-#output.knit <- knitr::knit_child(text = unlist(output), quiet = TRUE)
-#cat(output.knit)
-#`r cat(output, collapse='\n')`
 ```
 
 `r paste(output, collapse='\n')`

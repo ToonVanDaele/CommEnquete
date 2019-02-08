@@ -7,7 +7,7 @@ output:
     df_print: paged
 ---
 
-### `r QID`: `r VraagTitel` `r VraagTitelVervolg`
+### `r QID`: `r VraagTitelVervolg`
 
 ```{r results='asis', fig.width = 15, fig.height = {{fig_height}}}
 
