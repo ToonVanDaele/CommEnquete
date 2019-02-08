@@ -3,6 +3,7 @@ title: "Resultaten enquete interne communicatie 2018"
 author: "Irina de Landsheer, Toon Van Daele & Pieter Verschelde"
 date: "05 februari 2019"
 output:
+  word_document: default
   html_document:
     df_print: paged
 ---
@@ -70,8 +71,10 @@ countTable <- function(Qn) {
   df.respp %>%
     dplyr::filter(Q == Qn) %>%
     dplyr::ungroup(Q) %>%
-    dplyr::select(Jaar = jaar, Respons = Resp, n) %>%
+    dplyr::select(Jaar = jaar, Respons = Resp, n, Sort) %>%
     tidyr::spread(Jaar, n) %>%
+    arrange(Sort) %>%
+    select(-Sort) %>%
     pandoc.table()
   cat("  \n\n")
 }
