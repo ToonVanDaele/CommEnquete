@@ -3,9 +3,10 @@ title: "Resultaten enquete interne communicatie 2018"
 author: "Irina de Landsheer, Toon Van Daele & Pieter Verschelde"
 date: "05 februari 2019"
 output:
-  word_document: default
   html_document:
     df_print: paged
+  word_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -81,15 +82,10 @@ countTable <- function(Qn) {
 
 for (i in c("Q2", "Q3")) countTable(i)
 ```
-
+\pagebreak
+\newpage
+ 
 ```{r legend types}
-get_legend <- function(myplot){
-    tmp <- ggplot_gtable(ggplot_build(myplot))
-    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
-    legend <- tmp$grobs[[leg]]
-    return(legend)
-}
-
 create_legend <- function(LegendType, df.AType) {
   df.dummyplot <- df.AType %>%
     dplyr::filter(TypeID == LegendType, !Level == "Weet niet" ) %>%
@@ -106,16 +102,18 @@ create_legend <- function(LegendType, df.AType) {
             legend.direction = "horizontal",
             legend.background =  element_rect(colour = "black"))
   
-  mylegend <- get_legend(dummyplot)
-  return(mylegend)
+  g <- cowplot::get_legend(dummyplot)
+  h <- grid::convertHeight(sum(g$heights), "in", TRUE)
+  w <- grid::convertWidth(sum(g$widths), "in", TRUE)
+  ggplot2::ggsave(paste0(LegendType, ".png"), g, width = w, height = h)
+  return()
 }
 
 legendlist <- unique(df.AType$TypeID)
 legendType <- plyr::mlply(.data = legendlist, .fun = create_legend, df.AType)
-names(legendType) <- legendlist
 ```
 
-# Responses
+# Antwoorden
 
 ```{r include=FALSE, fig.height=3.5, fig.width=15, message=TRUE, warning=TRUE}
 df.Ql <- filter(df.Q, Export == "Ja" &
@@ -145,12 +143,14 @@ for (i in 1:nrow(df.Ql)) {
 
   if (!VraagTitel == prevVraagTitel) {
     output <- c(output, knitr::knit_child("TitleQuestionChild.Rmd"))
-    cat("  \n")
-  }
-  
-  if (!ATypeID == prevATypeID) {
     output <- c(output, knitr::knit_child("LegendChild.Rmd"))
     cat("  \n")
+  }else{
+  
+    if (!ATypeID == prevATypeID) {
+      output <- c(output, knitr::knit_child("LegendChild.Rmd"))
+      cat("  \n")
+    }
   }
 
   output <- c(output,knitr::knit_child("EnqueteChild.Rmd"))

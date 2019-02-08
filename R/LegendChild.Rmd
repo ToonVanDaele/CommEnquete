@@ -3,20 +3,14 @@ title: "LegendChild"
 author: "Toon Van Daele"
 date: "25 november 2016"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
+  word_document: default
 ---
 
 
-\newpage
 
-```{r results='asis', fig.width = 15, fig.heigth = 1}
-
-  gridExtra::grid.arrange(grid::textGrob(" "), legendType[[ATypeID]])
-
-  cat("  \n")
-
-
+```{r echo=FALSE}
+knitr::include_graphics(paste0(ATypeID, ".png"))
 ```
-
