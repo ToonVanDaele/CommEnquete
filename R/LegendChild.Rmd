@@ -12,5 +12,5 @@ output:
 
 
 ```{r echo=FALSE}
-knitr::include_graphics(paste0(ATypeID, ".png"))
+knitr::include_graphics(paste0(ATypeID, ".png"), dpi = 500)
 ```
