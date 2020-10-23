@@ -23,6 +23,9 @@ df.plot <- df.respp %>%
   dplyr::arrange(jaar, Sort) %>%
   dplyr::mutate(labely = cumsum(percentage) - 0.5 * percentage)
 df.plot$Resp <- factor(df.plot$Resp, levels = unique(df.plot[order(df.plot$Sort, decreasing = TRUE),]$Resp))
+# df.plot$Resp <- factor(df.plot$Resp, levels = c("Akkoord", "Eerder akkoord",
+#                                                 "Noch akkoord, noch niet akkoord",
+#                                                 "Eerder niet akkoord", "Niet akkoord"))
 
 myplot <- ggplot(df.plot, aes(x = as.factor(jaar), y = percentage)) +
   geom_bar(aes(fill = Resp), stat = 'identity') +
@@ -31,7 +34,7 @@ myplot <- ggplot(df.plot, aes(x = as.factor(jaar), y = percentage)) +
   scale_x_discrete(labels = labelx, expand = c(0,0)) +
   coord_flip() +
   xlab(" ") +
-  scale_fill_brewer(palette = 'RdYlGn', direction = -1) +
+  scale_fill_manual(values = manualRdGlGr) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
         panel.background = element_blank(), axis.title.x = element_blank(),
         axis.ticks.x = element_blank(),

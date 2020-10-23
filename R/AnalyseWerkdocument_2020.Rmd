@@ -1,0 +1,180 @@
+---
+title: "Resultaten enquete interne communicatie 2020"
+author: "Tessa Van Santen, Toon Van Daele & Pieter Verschelde"
+date: "22 oktober 2020"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(pander)
+library(grid)
+library(gridExtra)
+library(knitr)
+```
+
+```{r load data}
+path <- "G:/Mijn Drive/Project/CommunicatieEnquete_analyse/data/"
+df.resp <- readRDS(paste0(path, "/interim/Resp.Rdata"))
+df.Q <- readRDS(paste0(path, "/interim/Q.Rdata"))
+df.AType <- readRDS(paste0(path, "/interim/AType.Rdata"))
+```
+
+```{r manual_palette}
+manualRdGlGr <- c("#1a9641", "#a6d96a", "#ffffbf", "#fdae61", "#d7191c")
+```
+
+
+```{r NA_afhandeling}
+df.NA <- df.resp %>%
+  group_by(jaar) %>%
+  summarise(aantal_NA = sum(is.na(Resp)), .groups = "drop_last")
+
+df.resp <- df.resp %>%
+  mutate(Resp = ifelse(is.na(Resp), "Weet niet", Resp))
+```
+
+
+```{r}
+# Samenvattende tabel: antwoorden + vragen
+df.respp <- df.resp %>%
+  dplyr::filter(!Resp == "Weet niet") %>%
+  dplyr::group_by(jaar, Q, Resp) %>%
+  dplyr::summarise(n = n()) %>%
+  dplyr::mutate(percentage = 100 * n/sum(n)) %>%
+  dplyr::left_join(df.Q, by = c("Q" = "VraagID")) %>%
+  dplyr::left_join(df.AType, by = c("AntwoordTypeID" = "TypeID", "Resp" = "Level")) %>%
+  dplyr::select(jaar, Q, Resp, n, percentage, ATypeID = AntwoordTypeID, Sort = Sort.y, Score)
+
+df.weetniet <- df.resp %>%
+  dplyr::filter(Resp == "Weet niet") %>%
+  dplyr::group_by(jaar, Q) %>%
+  dplyr::summarise(weetniet = n())
+
+df.Score <- df.respp %>%
+  dplyr::filter(ATypeID %in% c("ANA", "GoedSlecht", "Belang", "JaNee")) %>%
+  dplyr::summarise(sumscore = sum(Score * n), nresp = sum(n)) %>%
+  dplyr::ungroup(jaar, Q) %>%
+  dplyr::transmute(jaar, Q, nresp, Index = round((sumscore - nresp) / (nresp * 4) * 100,1)) %>%
+  dplyr::left_join(df.weetniet, by = c("jaar" = "jaar", "Q" = "Q"))
+```
+
+## Aantal respondenten
+
+```{r results='asis'}
+df.temp <- df.resp %>%
+  filter(Q == "Q2") %>%
+  group_by(jaar) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  tidyr::spread(jaar, n)
+df.temp <- as.data.frame(df.temp)
+rownames(df.temp) <- "Aantal respondenten"
+pandoc.table(df.temp)
+```
+
+## Typering van de respondenten
+
+(De cijfers in de tabellen zijn aantal respondenten)
+
+```{r aantallen per categorie, results='asis'}
+countTable <- function(Qn) { 
+  cat("  \n### ", df.Q[df.Q$VraagID == Qn,]$VraagTitel, "  \n")
+  df.respp %>%
+    dplyr::filter(Q == Qn) %>%
+    dplyr::ungroup(Q) %>%
+    dplyr::select(Jaar = jaar, Respons = Resp, n, Sort) %>%
+    tidyr::spread(Jaar, n) %>%
+    arrange(Sort) %>%
+    select(-Sort) %>%
+    pandoc.table()
+  cat("  \n\n")
+}
+
+for (i in c("Q2", "Q3")) countTable(i)
+```
+\pagebreak
+\newpage
+ 
+```{r legend types}
+create_legend <- function(LegendType, df.AType) {
+  df.dummyplot <- df.AType %>%
+    dplyr::filter(TypeID == LegendType, !Level == "Weet niet" ) %>%
+    dplyr::select(Level, Sort) %>%
+    data.frame(y = 1)
+  df.dummyplot$Level <- factor(df.dummyplot$Level,
+                               levels = df.dummyplot$Level[order(df.dummyplot$Sort)])
+    
+  dummyplot <- ggplot(df.dummyplot, aes(x = Level, y = y, fill = Level)) +
+      geom_bar(stat = 'identity') +
+      scale_fill_brewer(palette = 'RdYlGn') +
+      labs(fill = "") +
+      theme(legend.text = element_text(size = 20),
+            legend.direction = "horizontal",
+            legend.background =  element_rect(colour = "black"))
+  
+  g <- cowplot::get_legend(dummyplot)
+  h <- grid::convertHeight(sum(g$heights), "in", TRUE)
+  w <- grid::convertWidth(sum(g$widths), "in", TRUE)
+  ggplot2::ggsave(paste0(LegendType, ".png"), g, width = w, height = h)
+  return()
+}
+
+legendlist <- unique(df.AType$TypeID)
+legendType <- plyr::mlply(.data = legendlist, .fun = create_legend, df.AType)
+```
+
+# Antwoorden
+
+```{r include=FALSE, fig.height=3.5, fig.width=15, message=TRUE, warning=TRUE}
+df.Ql <- filter(df.Q, Export == "Ja" &
+                  !VraagID %in% c("Q1", "Q2", "Q3", "Q4", "Q56","Q95", "Q105")) %>%
+         select(QID = VraagID, ATypeID = AntwoordTypeID, VraagTitel,
+         VraagTitelVervolg, Sort) %>%
+         arrange(Sort)
+#df.Ql <- slice(df.Ql, 45:46) # om te testen
+#df.Ql <- df.Ql[df.Ql$QID %in% c("Q25", "Q97"),]  # Dient enkel om te testen
+
+prevATypeID <- "none"
+prevVraagTitel <- "none"
+output <- NULL
+
+for (i in 1:nrow(df.Ql)) {
+  
+  QID <- df.Ql[i,"QID"]
+  ATypeID <- df.Ql[i,"ATypeID"]
+  VraagTitel <- df.Ql[i,"VraagTitel"]
+  VraagTitelVervolg <- df.Ql[i,"VraagTitelVervolg"]
+  nbjaar <- df.respp %>% 
+    dplyr::filter(Q == QID) %>%
+    dplyr::ungroup(Q) %>%
+    dplyr::select(jaar) %>%
+    dplyr::n_distinct()
+  fig_height <- nbjaar
+
+  if (!VraagTitel == prevVraagTitel) {
+    output <- c(output, knitr::knit_child("TitleQuestionChild.Rmd"))
+    output <- c(output, knitr::knit_child("LegendChild.Rmd"))
+    cat("  \n")
+  }else{
+  
+    if (!ATypeID == prevATypeID) {
+      output <- c(output, knitr::knit_child("LegendChild.Rmd"))
+      cat("  \n")
+    }
+  }
+
+  output <- c(output,knitr::knit_child("EnqueteChild.Rmd"))
+  prevATypeID <- ATypeID
+  prevVraagTitel <- VraagTitel
+    
+}
+
+```
+
+`r paste(output, collapse='\n')`
