@@ -14,7 +14,7 @@ output:
 #labels x-axis
 lx <- dplyr::filter(df.Score, Q == QID)
 lx$weetniet[is.na(lx$weetniet)] <- 0
-labelx <- unique(paste0(lx$jaar, "\n (n =", lx$nresp, ") \n (weet niet = ", lx$weetniet, ")"))
+labelx <- unique(paste0(lx$jaar, "\n (weet niet = ", lx$weetniet, ")"))
 
 #Select QID and calculate label positions in bars
 df.plot <- df.respp %>%
