@@ -32,10 +32,18 @@ manualRdGlGr <- c("#1a9641", "#a6d96a", "#ffffbf", "#fdae61", "#d7191c")
 
 
 ```{r NA_afhandeling}
-df.NA <- df.resp %>%
-  group_by(jaar) %>%
-  summarise(aantal_NA = sum(is.na(Resp)), .groups = "drop_last")
+# Enkel respondenten die minstens 1 echte vraag beantwoord hebben worden weerhouden
+allNA <- df.resp %>%
+  filter(!Q %in% c("Q2", "Q3")) %>%
+  group_by(`Respondent-ID`) %>%
+  summarise(all_NA = all(is.na(Resp)), .groups = "drop_last") %>%
+  filter(all_NA == TRUE) %>%
+  pull(`Respondent-ID`)
+  
 
+df.resp <- filter(df.resp, !`Respondent-ID` %in% allNA)
+
+# Alle antwoorden 'NA' worden omgezet in 'Weet niet'
 df.resp <- df.resp %>%
   mutate(Resp = ifelse(is.na(Resp), "Weet niet", Resp))
 ```
@@ -46,7 +54,7 @@ df.resp <- df.resp %>%
 df.respp <- df.resp %>%
   dplyr::filter(!Resp == "Weet niet") %>%
   dplyr::group_by(jaar, Q, Resp) %>%
-  dplyr::summarise(n = n()) %>%
+  dplyr::summarise(n = n(), .groups = "drop_last") %>%
   dplyr::mutate(percentage = 100 * n/sum(n)) %>%
   dplyr::left_join(df.Q, by = c("Q" = "VraagID")) %>%
   dplyr::left_join(df.AType, by = c("AntwoordTypeID" = "TypeID", "Resp" = "Level")) %>%
@@ -55,11 +63,11 @@ df.respp <- df.resp %>%
 df.weetniet <- df.resp %>%
   dplyr::filter(Resp == "Weet niet") %>%
   dplyr::group_by(jaar, Q) %>%
-  dplyr::summarise(weetniet = n())
+  dplyr::summarise(weetniet = n(), .groups = "drop_last")
 
 df.Score <- df.respp %>%
   dplyr::filter(ATypeID %in% c("ANA", "GoedSlecht", "Belang", "JaNee")) %>%
-  dplyr::summarise(sumscore = sum(Score * n), nresp = sum(n)) %>%
+  dplyr::summarise(sumscore = sum(Score * n), nresp = sum(n), .groups = "drop_last") %>%
   dplyr::ungroup(jaar, Q) %>%
   dplyr::transmute(jaar, Q, nresp, Index = round((sumscore - nresp) / (nresp * 4) * 100,1)) %>%
   dplyr::left_join(df.weetniet, by = c("jaar" = "jaar", "Q" = "Q"))
